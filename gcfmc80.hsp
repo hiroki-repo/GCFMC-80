@@ -129,7 +129,10 @@ addrfordlx=0xF233+(stackpeek(0,0,2)*16)
 if stackpeek(0,0,2)<=3 or stackpeek(0,0,2)=15{
 if stackpeek(0,0,2)=15{
 repeat
-diskimagefname="gcfmc80dsk-"+str(rnd(15))+".img"
+randomizeddataint=0
+randomizeddataint=rnd(15)
+addrfordlx=0xF233+(randomizeddataint*16)
+diskimagefname="gcfmc80dsk-"+str(randomizeddataint)+".img"
 exist diskimagefname
 if strsize=-1{}else{break}
 loop
