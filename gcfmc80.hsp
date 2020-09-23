@@ -1,0 +1,217 @@
+#runtime "hsp3cl"
+#pack "gcfmc80.hsp"
+#pack "z80.as"
+//#epack "cpm62.sys"
+#uselib "crtdll.dll"
+#cfunc _kbhit "_kbhit"
+#cfunc _getch "_getch"
+#include "z80.as"
+#packopt name "gcfmc80"
+randomize
+minusaddr=0
+diskimagefname="gcfmc80dsk-0.img"
+//diskimagefname="A-Hdrive"
+//diskimagefname="image1.img"
+mes "Gocaine flex-micro computer 80(GCFMC-80) by Gocaine project"
+mes "CPU :Kiskan-Z80"
+exist diskimagefname
+strsize2=strsize
+if strsize2=-1{sdim diskimage,256*512*16:bsave diskimagefname,diskimage:strsize2=256*512*16}
+repeat 15
+diskimagefname="gcfmc80dsk-"+str(cnt)+".img"
+exist diskimagefname
+strsize2=strsize
+if strsize2=-1{mes "Disk "+str(cnt)+":Not installed."}else{
+sdim bootsign,256
+bload diskimagefname,bootsign,256,0
+if wpeek(bootsign,0x40)=0x3D01 or wpeek(bootsign,0x40)=0x3D02{bootsignforusermes="Bootable"}else{bootsignforusermes="Normal"}
+mes "Disk "+str(cnt)+":"+str(strsize2/1024)+"KBytes disk installed. ["+bootsignforusermes+"]"
+}
+loop
+mes
+diskimagefname="gcfmc80dsk-0.img"
+z80hltendset 0,2
+address=0
+sdim memory,65536
+poke memory,0,0x76
+/*exist "cpm62.sys"
+strsize2forcpmdata=strsize
+sdim cpmsys,strsize2forcpmdata
+bload "cpm62.sys",cpmsys*/
+sdim bootsign,256
+bload diskimagefname,bootsign,256,0
+if wpeek(bootsign,0x40)=0x3D01 or wpeek(bootsign,0x40)=0x3D02{
+mes "Booting the disk..."
+addrforcpmdataextracted=0
+bload diskimagefname,addrforcpmdataextracted,4,0x1E0
+strsize2forcpmdata=wpeek(addrforcpmdataextracted,2)
+sdim cpmsys,strsize2forcpmdata
+bload diskimagefname,cpmsys,strsize2forcpmdata,0x1F0
+memcpy memory,cpmsys,strsize2forcpmdata,wpeek(addrforcpmdataextracted,0),0
+sdim mbrforaplm,128
+bload diskimagefname,mbrforaplm,128,0x100
+memcpy memory,mbrforaplm,128,0,0
+/*poke memory,0,0xC3
+//wpoke memory,1,0xF200
+wpoke memory,1,0xDC00
+//wpoke memory,1,0x100
+poke memory,5,0xC3
+wpoke memory,6,0xE406
+sdim program,0x10000*/
+/*bload "cpm/xsub.com",program
+memcpy memory,program,0xDA00,0x100,0*/
+repeat
+isioportcalledx=getioportread16bitaddr(address,memory)
+if isioportcalledx!=-1{}
+z80run address,memory,0
+isioportcalledx=isioportcalled()
+//if isioportcalledx!=-1{strformiomemory="":lpoke strformiomemory,0,ioportpeek(isioportcalledx):mes strformiomemory,1}
+//if address=5{dialog stackpeek(0,0,2)}
+repeat 33
+if address=0xF200+3*cnt{syscallid=cnt
+if syscallid>=2{
+addressforz80sp=(stackpeek(0,0,12)+(stackpeek(0,0,13)<<8))
+address=wpeek(memory,wpeek(addressforz80sp))
+addressforz80sp+=2
+stackpoke 0,0,13,peek(addressforz80sp,1)
+stackpoke 0,0,12,peek(addressforz80sp,0)
+}
+logmes "scall:"+syscallid
+switch syscallid
+case 0
+address=0xDC00
+memcpy memory,cpmsys,strsize2forcpmdata,0xDC00,0
+poke memory,0,0xC3
+wpoke memory,1,0xDC00
+swbreak
+case 1
+address=0xDC00
+memcpy memory,cpmsys,strsize2,0xDC00,0
+poke memory,0,0xC3
+wpoke memory,1,0xDC00
+swbreak
+case 2
+if _kbhit(){stackpoke 0,0,0,0xFF}else{stackpoke 0,0,0,0}
+swbreak
+case 3
+istyped=0
+/*onkey gosub *hlekeyget
+repeat
+if peek(var_24,0)=0{}else{break}
+await:loop
+onkey 0*/
+hlekeygetenabled=1
+//if peek(var_24,0)=0{}else{wparam2=0}
+//repeat
+wparam2=0
+//if _kbhit(){wparam2=_getch()}
+repeat:if _kbhit(){wparam2=_getch():break}:await 1:loop
+stackpoke 0,0,0,wparam2
+//if peek(var_24,0)=0{}else{break}
+//loop
+wparam2=0
+if stackpeek(0,0,0)=0{hlekeygetenabled=0}else{istyped=1}
+hlekeygetenabled=0
+swbreak
+case 4
+showstr=""
+poke showstr,0,stackpeek(0,0,2)
+mes showstr,1
+swbreak
+case 8
+trackaddr=2
+sectoraddr=0
+swbreak
+case 9
+logmes "diskl:"+stackpeek(0,0,2)
+addrfordlx=0
+addrfordlx=0xF233+(stackpeek(0,0,2)*16)
+if stackpeek(0,0,2)<=3 or stackpeek(0,0,2)=15{
+if stackpeek(0,0,2)=15{
+repeat
+diskimagefname="gcfmc80dsk-"+str(rnd(15))+".img"
+exist diskimagefname
+if strsize=-1{}else{break}
+loop
+}else{
+diskimagefname="gcfmc80dsk-"+str(stackpeek(0,0,2))+".img"
+}
+exist diskimagefname
+strsize2=strsize
+if strsize2=-1{
+stackpoke 0,0,7,0x00
+stackpoke 0,0,6,0x00
+}else{
+stackpoke 0,0,7,(addrfordlx >> 8) &0xFF
+stackpoke 0,0,6,addrfordlx & 0xFF
+}
+}else{
+stackpoke 0,0,7,0x00
+stackpoke 0,0,6,0x00
+}
+/*switch stackpeek(0,0,2)
+case 0
+stackpoke 0,0,7,0xF2
+stackpoke 0,0,6,0x33
+swbreak
+case 11
+stackpoke 0,0,7,0xF2
+stackpoke 0,0,6,0x33
+swbreak
+case 15
+stackpoke 0,0,7,0xF2
+stackpoke 0,0,6,0x33
+swbreak
+default
+stackpoke 0,0,7,0x00
+stackpoke 0,0,6,0x00
+swbreak
+swend*/
+swbreak
+case 10
+trackaddr=stackpeek(0,0,2)+(stackpeek(0,0,3)<<8)
+logmes "diskt:"+trackaddr
+swbreak
+case 11
+sectoraddr=stackpeek(0,0,2)+(stackpeek(0,0,3)<<8)
+logmes "disks:"+sectoraddr
+swbreak
+case 12
+dmaaddr=stackpeek(0,0,2)+(stackpeek(0,0,3)<<8)
+logmes "diskd:"+dmaaddr
+swbreak
+case 13
+stackpoke 0,0,0,0
+sdim sectblock,128
+bload diskimagefname,sectblock,128,128*((sectoraddr)+(trackaddr*26))-minusaddr
+logmes "disk i/o(load):"+str(128*((sectoraddr)+(trackaddr*26))-minusaddr)
+memcpy memory,sectblock,128,dmaaddr,0
+stackpoke 0,0,0,0
+swbreak
+case 14
+stackpoke 0,0,0,0
+stackpoke 0,0,2,0
+sdim sectblock,128
+memcpy sectblock,memory,128,0,dmaaddr
+bsave diskimagefname,sectblock,128,128*((sectoraddr)+(trackaddr*26))-minusaddr
+logmes "disk i/o(save):"+str(128*((sectoraddr)+(trackaddr*26))-minusaddr)
+stackpoke 0,0,0,0
+swbreak
+case 16
+addrfortbl=stackpeek(0,0,2)+(stackpeek(0,0,3)<<8)+1
+/*sdim tbldata,1024
+memcpy tbldata,memory,1024,0,addrfortbl*/
+stackpoke 0,0,6,addrfortbl & 0xFF
+stackpoke 0,0,7,addrfortbl>>8
+swbreak
+case 17
+stackpoke 0,0,0,0xFF
+swbreak
+swend
+}//:strformiomemory="":lpoke strformiomemory,0,stackpeek(0,0,4):mes strformiomemory,1}
+loop
+//await// 1
+loop
+}else{mes "This root drive is not a bootable disk!"
+mes "Operating system not found!"
+}
