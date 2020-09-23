@@ -8,6 +8,8 @@
 #include "z80.as"
 #packopt name "gcfmc80"
 randomize
+bootabledrivecount=0
+dim bootabledevicelist,16
 minusaddr=0
 diskimagefname="gcfmc80dsk-0.img"
 //diskimagefname="A-Hdrive"
@@ -24,12 +26,18 @@ strsize2=strsize
 if strsize2=-1{mes "Disk "+str(cnt)+":Not installed."}else{
 sdim bootsign,256
 bload diskimagefname,bootsign,256,0
-if wpeek(bootsign,0x40)=0x3D01 or wpeek(bootsign,0x40)=0x3D02{bootsignforusermes="Bootable"}else{bootsignforusermes="Normal"}
+if wpeek(bootsign,0x40)=0x3D01 or wpeek(bootsign,0x40)=0x3D02{bootabledevicelist(cnt)=1:bootabledrivecount=bootabledrivecount+1:bootsignforusermes="Bootable"}else{bootsignforusermes="Normal"}
 mes "Disk "+str(cnt)+":"+str(strsize2/1024)+"KBytes disk installed. ["+bootsignforusermes+"]"
 }
 loop
+repeat
+bootdrive=0
+if bootabledrivecount>=2{mes "boot-drive(0) :",1:input bootdrvintstr,3,2:bootdrive=int(bootdrvintstr)}
+diskimagefname="gcfmc80dsk-"+str(bootdrive)+".img"
+if bootdrive>=15{mes "Please select disk from 0 to 14."}else{
+exist diskimagefname
+if strsize=-1{mes "Disk "+str(bootdrive)+" is not recognized."}else{break}}:loop
 mes
-diskimagefname="gcfmc80dsk-0.img"
 z80hltendset 0,2
 address=0
 sdim memory,65536
@@ -79,16 +87,16 @@ stackpoke 0,0,12,peek(addressforz80sp,0)
 logmes "scall:"+syscallid
 switch syscallid
 case 0
-address=0xDC00
-memcpy memory,cpmsys,strsize2forcpmdata,0xDC00,0
+address=wpeek(addrforcpmdataextracted,0)
+memcpy memory,cpmsys,strsize2forcpmdata,wpeek(addrforcpmdataextracted,0),0
 poke memory,0,0xC3
-wpoke memory,1,0xDC00
+wpoke memory,1,wpeek(addrforcpmdataextracted,0)
 swbreak
 case 1
-address=0xDC00
-memcpy memory,cpmsys,strsize2,0xDC00,0
+address=wpeek(addrforcpmdataextracted,0)
+memcpy memory,cpmsys,strsize2,wpeek(addrforcpmdataextracted,0),0
 poke memory,0,0xC3
-wpoke memory,1,0xDC00
+wpoke memory,1,wpeek(addrforcpmdataextracted,0)
 swbreak
 case 2
 if _kbhit(){stackpoke 0,0,0,0xFF}else{stackpoke 0,0,0,0}
